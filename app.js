@@ -1,55 +1,124 @@
-const express = require("express")
-const app = express()
+const express = require("express");
+const app = express();
 const bodyParser = require("body-parser");
-const ejs = require("ejs")
+const ejs = require("ejs");
+const mongooose = require("mongoose");
+const _ = require("lodash");
 
-app.use(bodyParser.urlencoded({extended: true}))
-app.set('view engine', 'ejs');
-app.use(express.static("public"))
+mongooose.connect("mongodb+srv://roshan-admin:8802@cluster0.jyeag.mongodb.net/todolistDB", { useNewUrlParser: true,});
+app.use(bodyParser.urlencoded({ extended: true }));
+app.set("view engine", "ejs");
+app.use(express.static("public"));
 
-var newItem = ["Read", "Write"];
-var workItems = [];
+const itemsSchema = {
+    name: String,
+};
 
+const itemModel = mongooose.model("item", itemsSchema);
 
-app.get("/", function(req, res){
-    var today = new Date();
-   
-    var options = { 
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric"
+const item1 = new itemModel({
+    name: "Enter below your enteries.",
+});
+
+const itemArray1 = [item1];
+
+const listSchema = {
+    name: String,
+    items: [itemsSchema],
+};
+
+const listModel = mongooose.model("list", listSchema);
+
+app.get("/", function (req, res) {
+    itemModel.find({}, function (err, foundItems) {
+        if (err) console.log(err);
+        // else console.log(foundItems);
+
+        if (foundItems.length === 0) {
+            itemModel.insertMany(itemArray1, function (err) {
+                if (err) console.log(err);
+                else console.log("data successfully added to the database.");
+            });
+            res.render("index", { listTitle: "Today", newListItems: foundItems });
+        } else res.render("index", { listTitle: "Today", newListItems: foundItems });
+    });
+});
+
+app.get("/:customListName", function (req, res) {
+    const customRouteName = _.capitalize(req.params.customListName);
+
+    listModel.findOne({ name: customRouteName }, function (err, foundList) {
+        if (!err) {
+            if (!foundList) {
+                const list = new listModel({
+                    name: customRouteName,
+                    items: itemArray1,
+                });
+
+                list.save();
+                res.redirect("/" + customRouteName);
+            } else {
+                res.render("index", {
+                    listTitle: foundList.name,
+                    newListItems: foundList.items,
+                });
+            }
+        }
+    });
+});
+
+app.post("/", function (req, res) {
+    const bodyItem = req.body.listItem;
+    const listHeadingName = req.body.listHeading;
+
+    const newMongoDocument = new itemModel({
+        name: bodyItem,
+    });
+
+    if (listHeadingName === "Today") {
+        newMongoDocument.save();
+        res.redirect("/");
+    } else {
+        listModel.findOne({ name: listHeadingName }, function (err, foundList) {
+            foundList.items.push(newMongoDocument);
+            foundList.save();
+            res.redirect("/" + listHeadingName);
+        });
     }
+});
 
-    var day = today.toLocaleDateString("en-US", options);
-    console.log("Today's date " + day);
-    res.render("index", {listTitle: day, newListItems: newItem});
+app.post("/delete", function (req, res) {
+    const checkedItemId = req.body.checkbox;
+    const listName = req.body.listName;
 
-})
+    if (listName === "Today") {
+        itemModel.findByIdAndRemove(checkedItemId, function (err) {
+            if (err) console.log(err);
+            else console.log("Checked item successfully removed.");
+        });
 
-app.post("/", function(req, res){
-    bodyItem = req.body.listItem;
-    var newListHeading = req.body.buttonList;
-    // console.log("button name: "+ newListHeading);
-    if(newListHeading === "Work"){
-        workItems.push(bodyItem);
-        res.redirect("/work")
+        res.redirect("/");
+    } else {
+        listModel.findOneAndUpdate(
+            { name: listName },
+            { $pull: { items: { _id: checkedItemId } } },
+            function (err, foundList) {
+                if (!err) {
+                    res.redirect("/" + listName);
+                }
+            }
+        );
     }
+});
 
-    else{
-        newItem.push(bodyItem);
-    res.redirect("/");
-    }
-})
 
-app.get("/work", function(req, res){
-    res.render("index", {listTitle: "Work Item", newListItems: workItems});
-})
 
-app.get("/about", function(req, res){
-    res.render("about");
-})
+let port = process.env.PORT;
+if (port == null || port == "") {
+  port = 8000;
+}
 
-app.listen(3000, function(){
-    console.log("Server is running on port 3000.")
-})
+app.listen(port, function () {
+    console.log("Server is started successfully.");
+});
+ 

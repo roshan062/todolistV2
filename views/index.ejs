@@ -10,18 +10,23 @@
         <ul>
 
             <% for(var i=0; i<newListItems.length; i++){ %>
+                <form action="/delete" method="post">
                 <div class="item">
-                    <input type="checkbox">
+                    <input type="checkbox" name="checkbox" value="<%=newListItems[i]._id%>" onChange="this.form.submit()">
                     <p>
-                        <%= newListItems[i]%>
+                        <%= newListItems[i].name%>
                     </p>
                 </div>
+                <input type="hidden" name="listName" value="<%=listTitle%>">
+            </form>
                 <% } %>
 
         </ul>
+
+
         <form class="item" action="/" method="post">
             <input type="text" name="listItem" placeholder="New Item" autocomplete="off">
-            <button type="submit" name="buttonList" value=<%= listTitle %> >+</button>
+            <button type="submit" name="listHeading" value=<%= listTitle %> >+</button>
         </form>
     </div>
 
